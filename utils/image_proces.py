@@ -65,7 +65,7 @@ def find_document_corners(edge_image):
 
 if __name__ == "__main__":    
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    test_image_path = os.path.join(script_dir, "../Data_test_eng/images/13.jpg")
+    test_image_path = os.path.join(script_dir, "../Data_test_eng/images/5.jpg")
     
     #โหลดภาพจากไฟล์
     original_image = get_image(test_image_path)
