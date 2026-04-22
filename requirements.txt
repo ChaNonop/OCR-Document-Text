@@ -1,4 +1,7 @@
 opencv-python
 numpy
 easyocr
+fastapi
+uvicorn
 streamlit
+python-multipart
