@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DocScan OCR — Document Categorizer</title>
+    
+    <!-- นำเข้า Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
+    
+    <!-- นำเข้า Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <link rel="stylesheet" href="styles.css">
+
+</head>
+<body class="min-h-screen flex flex-col items-center py-10 px-4 sm:px-6">
+
+    <!-- Header -->
+    <header class="w-full max-w-6xl mb-8">
+        <h1 class="text-3xl font-bold tracking-wider flex items-center gap-3">
+            <span class="text-[var(--cyan)]">◈</span> 
+            DocScan OCR
+        </h1>
+        <p class="text-[var(--muted)] font-mono text-sm mt-2">AI-POWERED DOCUMENT CATEGORIZER // V1.0</p>
+    </header>
+
+    <!-- ========================================== -->
+    <!-- ส่วนที่ 2: โครงสร้าง HTML (index.html)        -->
+    <!-- ========================================== -->
+    <main class="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-12 gap-6">
+        
+        <!-- Left Column: Upload & Original Preview -->
+        <div class="lg:col-span-5 space-y-6">
+            
+            <!-- Upload Card -->
+            <div class="glass-card p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-sm font-semibold tracking-widest text-[var(--muted)] uppercase">Input Source</h2>
+                    <span class="text-xs font-mono bg-[var(--surface)] px-2 py-1 rounded text-[var(--cyan)] border border-[var(--border)]">READY</span>
+                </div>
+
+                <form id="uploadForm" class="space-y-4">
+                    <div id="dropZone" class="upload-area rounded-lg p-8 flex flex-col items-center justify-center text-center relative">
+                        <input type="file" id="fileInput" accept="image/*" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" required>
+                        <svg class="w-12 h-12 text-[var(--muted)] mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                        <p class="text-sm font-medium mb-1">Drop image here or browse</p>
+                        <p class="text-xs text-[var(--muted)] font-mono">JPG, PNG, WEBP (MAX. 5MB)</p>
+                    </div>
+
+                    <button type="submit" id="submitBtn" class="btn-primary w-full py-3 rounded-md font-bold uppercase tracking-wider flex items-center justify-center gap-2" disabled>
+                        <span>Upload Document</span>
+                    </button>
+                </form>
+            </div>
+
+            <!-- Original Image Preview -->
+            <div id="originalPreviewCard" class="glass-card p-6 hidden">
+                <h2 class="text-sm font-semibold tracking-widest text-[var(--muted)] uppercase mb-4">Original Image</h2>
+                <div id="imageContainer" class="relative rounded bg-[var(--surface)] border border-[var(--border)] flex items-center justify-center overflow-hidden min-h-[200px]">
+                    <img id="originalImg" src="" alt="Original" class="max-h-[300px] object-contain opacity-80">
+                    <div class="scanner-line"></div>
+                    
+                    <!-- Loading Overlay (ในรูป) -->
+                    <div id="scanOverlay" class="absolute inset-0 bg-[#080c14cc] backdrop-blur-sm hidden flex-col items-center justify-center">
+                        <div class="loader mb-3"></div>
+                        <span class="text-xs font-mono text-[var(--cyan)] animate-pulse">PROCESSING DATA...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Column: Results -->
+        <div class="lg:col-span-7 space-y-6">
+            
+            <!-- Empty State -->
+            <div id="emptyState" class="glass-card p-12 h-full flex flex-col items-center justify-center text-center min-h-[400px]">
+                <svg class="w-16 h-16 text-[var(--border2)] mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+                <p class="text-[var(--muted)] font-mono text-sm">AWAITING DOCUMENT INPUT...</p>
+            </div>
+
+            <!-- Result Container -->
+            <div id="resultContainer" class="hidden space-y-6">
+                
+                <!-- Top Row: Cropped Image & Categories -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    
+                    <!-- Cropped Image -->
+                    <div class="glass-card p-6">
+                        <h2 class="text-sm font-semibold tracking-widest text-[var(--muted)] uppercase mb-4">Processed Image</h2>
+                        <div class="bg-[var(--surface)] border border-[var(--border)] rounded p-2 flex items-center justify-center min-h-[200px]">
+                            <img id="processedImg" src="" alt="Cropped" class="max-h-[250px] object-contain">
+                        </div>
+                    </div>
+
+                    <!-- Categories / Tags -->
+                    <div class="glass-card p-6">
+                        <h2 class="text-sm font-semibold tracking-widest text-[var(--muted)] uppercase mb-4">Categorized Content</h2>
+                        <div id="tagsArea" class="space-y-3">
+                            <!-- Tags will be injected here -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Bottom Row: Raw OCR Text -->
+                <div class="glass-card p-6 flex flex-col h-[300px]">
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-sm font-semibold tracking-widest text-[var(--muted)] uppercase">Raw OCR Text</h2>
+                        <button id="copyBtn" class="text-xs font-mono text-[var(--cyan)] hover:text-white transition-colors">
+                            [ COPY ALL ]
+                        </button>
+                    </div>
+                    <textarea id="ocrTextarea" class="ocr-textarea w-full flex-1 p-4 rounded font-mono text-sm leading-relaxed" spellcheck="false" readonly></textarea>
+                </div>
+
+            </div>
+        </div>
+    </main>
+
+</body>
+</html>

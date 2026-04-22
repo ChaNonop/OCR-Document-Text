@@ -1,120 +1,151 @@
-const dropArea = document.getElementById("dropArea");
-const fileInput = document.getElementById("fileInput");
-const uploadBtn = document.getElementById("uploadBtn");
-const loading = document.getElementById("loading");
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // Elements
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const submitBtn = document.getElementById('submitBtn');
+        const uploadForm = document.getElementById('uploadForm');
+        
+        const originalPreviewCard = document.getElementById('originalPreviewCard');
+        const originalImg = document.getElementById('originalImg');
+        const imageContainer = document.getElementById('imageContainer');
+        const scanOverlay = document.getElementById('scanOverlay');
+        
+        const emptyState = document.getElementById('emptyState');
+        const resultContainer = document.getElementById('resultContainer');
+        
+        const processedImg = document.getElementById('processedImg');
+        const tagsArea = document.getElementById('tagsArea');
+        const ocrTextarea = document.getElementById('ocrTextarea');
+        const copyBtn = document.getElementById('copyBtn');
 
-const modal = document.getElementById("modal");
-const modalText = document.getElementById("modalText");
-const closeModal = document.getElementById("closeModal");
-const copyBtn = document.getElementById("copyBtn");
+        // 1. จัดการ Drag & Drop ลูกเล่นอัปโหลด
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, preventDefaults, false);
+        });
+        function preventDefaults(e) { e.preventDefault(); e.stopPropagation(); }
 
-const resultSection = document.getElementById("resultSection");
-const textContent = document.getElementById("textContent");
-const tagsContainer = document.getElementById("tags");
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => dropZone.classList.add('dragover'), false);
+        });
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => dropZone.classList.remove('dragover'), false);
+        });
 
-/* Click upload */
-dropArea.addEventListener("click", () => fileInput.click());
+        dropZone.addEventListener('drop', (e) => {
+            let dt = e.dataTransfer;
+            let files = dt.files;
+            fileInput.files = files;
+            handleFileSelect(files[0]);
+        });
 
-/* Drag & Drop */
-dropArea.addEventListener("dragover", (e) => {
-  e.preventDefault();
-  dropArea.classList.add("border-indigo-500");
-});
+        fileInput.addEventListener('change', function() {
+            handleFileSelect(this.files[0]);
+        });
 
-dropArea.addEventListener("dragleave", () => {
-  dropArea.classList.remove("border-indigo-500");
-});
+        // 2. แสดงรูปตัวอย่าง
+        function handleFileSelect(file) {
+            if (file && file.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    originalImg.src = e.target.result;
+                    originalPreviewCard.classList.remove('hidden');
+                    submitBtn.disabled = false;
+                    
+                    // เคลียร์ผลลัพธ์เก่าเวลาเลือกรูปใหม่
+                    emptyState.classList.remove('hidden');
+                    resultContainer.classList.add('hidden');
+                }
+                reader.readAsDataURL(file);
+                
+                // เปลี่ยนข้อความใน Dropzone
+                dropZone.querySelector('p.font-medium').textContent = file.name;
+                dropZone.querySelector('p.font-mono').textContent = `READY TO SCAN`;
+            }
+        }
 
-dropArea.addEventListener("drop", (e) => {
-  e.preventDefault();
-  fileInput.files = e.dataTransfer.files;
-});
+        // 3. จัดการตอนกดปุ่ม Upload (ส่งไปหลังบ้าน)
+        uploadForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const file = fileInput.files[0];
+            if (!file) return;
 
-/* Upload button */
-uploadBtn.addEventListener("click", () => {
-  if (!fileInput.files.length) {
-    alert("Please upload a file first");
-    return;
-  }
+            // เปิด Animation Loading และ Scanner
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<div class="loader mr-2"></div> SCANNING...';
+            imageContainer.classList.add('is-scanning');
+            scanOverlay.classList.remove('hidden');
+            scanOverlay.classList.add('flex');
 
-  loading.classList.remove("hidden");
+            const formData = new FormData();
+            formData.append('file', file);
 
-  setTimeout(() => {
-    loading.classList.add("hidden");
+            try {
+                // เรียก API Python FastAPI (อย่าลืมรัน uvicorn)
+                const response = await fetch('http://127.0.0.1:8000/api/upload', {
+                    method: 'POST',
+                    body: formData
+                });
 
-    const fakeText = `
-# Invoice
+                const data = await response.json();
 
-Date: 2026-04-22
-Customer: John Doe
+                if (!response.ok) throw new Error(data.error || 'Server Error');
 
-## Items
-- Product A - $100
-- Product B - $50
+                // ปิด Loading
+                stopLoadingState();
 
-## Total
-$150
-    `;
+                // ซ่อนหน้าว่าง แสดงหน้าผลลัพธ์
+                emptyState.classList.add('hidden');
+                resultContainer.classList.remove('hidden');
 
-    // Show modal
-    modal.classList.remove("hidden");
-    modal.classList.add("flex");
-    modalText.value = fakeText;
+                // 4. แสดงรูปที่ตัดขอบแล้ว
+                processedImg.src = data.processed_image_base64;
 
-    // Show result section
-    renderResult(fakeText);
+                // 5. แสดง Tags / Categories แบบ Badge ล้ำๆ
+                tagsArea.innerHTML = '';
+                if (data.tags && data.tags.length > 0) {
+                    data.tags.forEach(tag => {
+                        const badge = document.createElement('div');
+                        badge.className = 'tag-badge px-3 py-2 rounded flex items-center font-mono text-sm tracking-wide';
+                        badge.innerHTML = `<span class="mr-2">◈</span> ${tag.replace('#', '')}`;
+                        tagsArea.appendChild(badge);
+                    });
+                } else {
+                    tagsArea.innerHTML = '<span class="text-[var(--muted)] font-mono text-sm">NO CATEGORY MATCHED</span>';
+                }
 
-  }, 2000);
-});
+                // 6. แสดงข้อความใน Textarea
+                if (data.texts && data.texts.length > 0) {
+                    ocrTextarea.value = data.texts.join('\n');
+                } else {
+                    ocrTextarea.value = '// NO TEXT DETECTED IN THIS DOCUMENT';
+                }
 
-/* Render result with tags */
-function renderResult(text) {
-  resultSection.classList.remove("hidden");
+            } catch (error) {
+                console.error(error);
+                stopLoadingState();
+                alert(`Error: ${error.message}`);
+            }
+        });
 
-  textContent.innerHTML = "";
-  tagsContainer.innerHTML = "";
+        function stopLoadingState() {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<span>Upload Document</span>';
+            imageContainer.classList.remove('is-scanning');
+            scanOverlay.classList.add('hidden');
+            scanOverlay.classList.remove('flex');
+        }
 
-  const lines = text.split("\n");
-
-  lines.forEach((line, index) => {
-    if (line.startsWith("#")) {
-      const id = "section-" + index;
-
-      // Create tag
-      const tag = document.createElement("button");
-      tag.textContent = line.replace(/#/g, "").trim();
-      tag.className = "bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-xs";
-
-      tag.onclick = () => {
-        document.getElementById(id).scrollIntoView({ behavior: "smooth" });
-      };
-
-      tagsContainer.appendChild(tag);
-
-      // Create heading
-      const h = document.createElement("div");
-      h.id = id;
-      h.className = "font-semibold mt-3";
-      h.textContent = line.replace(/#/g, "").trim();
-
-      textContent.appendChild(h);
-    } else {
-      const p = document.createElement("div");
-      p.className = "text-sm";
-      p.textContent = line;
-      textContent.appendChild(p);
-    }
-  });
-}
-
-/* Close modal */
-closeModal.addEventListener("click", () => {
-  modal.classList.add("hidden");
-});
-
-/* Copy text */
-copyBtn.addEventListener("click", () => {
-  navigator.clipboard.writeText(modalText.value);
-  copyBtn.textContent = "Copied!";
-  setTimeout(() => (copyBtn.textContent = "Copy Text"), 1500);
-});
+        // 7. ฟังก์ชัน Copy
+        copyBtn.addEventListener('click', () => {
+            if (ocrTextarea.value) {
+                ocrTextarea.select();
+                document.execCommand('copy');
+                
+                const originalText = copyBtn.innerHTML;
+                copyBtn.innerHTML = '<span class="text-[var(--green)]">[ COPIED! ]</span>';
+                setTimeout(() => copyBtn.innerHTML = originalText, 2000);
+            }
+        });
+    });
+</script>
