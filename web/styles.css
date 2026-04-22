@@ -1,0 +1,111 @@
+:root {
+  --bg:       #080c14;
+  --surface:  #0e1421;
+  --card:     #131927;
+  --border:   #1e2d45;
+  --border2:  #2a3f5f;
+  --cyan:     #00d4ff;
+  --cyan-dim: #00d4ff22;
+  --green:    #00ff9d;
+  --green-dim:#00ff9d18;
+  --text-main:#dce8f5;
+  --muted:    #5a7394;
+}
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  background-color: var(--bg);
+  color: var(--text-main);
+}
+
+.font-mono { font-family: 'Space Mono', monospace; }
+
+/* Custom Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--surface); }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--cyan); }
+
+/* UI Components */
+.glass-card {
+  background-color: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+}
+
+.upload-area {
+  border: 2px dashed var(--border2);
+  transition: all 0.3s ease;
+}
+.upload-area:hover, .upload-area.dragover {
+  border-color: var(--cyan);
+  background-color: var(--cyan-dim);
+}
+
+.btn-primary {
+  background-color: var(--cyan);
+  color: #000;
+  transition: all 0.3s ease;
+  box-shadow: 0 0 10px var(--cyan-dim);
+}
+.btn-primary:hover:not(:disabled) {
+  box-shadow: 0 0 20px rgba(0, 212, 255, 0.6);
+  transform: translateY(-1px);
+}
+.btn-primary:disabled {
+  background-color: var(--border2);
+  color: var(--muted);
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.tag-badge {
+  background-color: var(--green-dim);
+  color: var(--green);
+  border: 1px solid rgba(0, 255, 157, 0.3);
+}
+
+.ocr-textarea {
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--cyan);
+  resize: none;
+}
+.ocr-textarea:focus {
+  outline: none;
+  border-color: var(--cyan);
+  box-shadow: 0 0 0 1px var(--cyan);
+}
+
+/* Scanner Animation */
+.scanner-line {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: var(--cyan);
+  box-shadow: 0 0 10px var(--cyan), 0 0 20px var(--cyan);
+  animation: scan 2s linear infinite;
+  display: none;
+}
+@keyframes scan {
+  0% { top: 0; opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { top: 100%; opacity: 0; }
+}
+.is-scanning .scanner-line { display: block; }
+.is-scanning img { filter: grayscale(50%) contrast(120%); }
+
+/* Loader */
+.loader {
+  border: 3px solid var(--border);
+  border-top: 3px solid var(--cyan);
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  animation: spin 1s linear infinite;
+}
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
