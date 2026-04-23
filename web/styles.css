@@ -699,6 +699,30 @@ body {
 .animate-in-delay-5 { animation-delay: 0.5s; opacity: 0; }
 .animate-in-delay-6 { animation-delay: 0.6s; opacity: 0; }
 
+/* ═══ Interactive Highlighting ═══ */
+.tag-badge--clickable {
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.tag-badge--clickable:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 240, 255, 0.3);
+  filter: brightness(1.2);
+}
+
+@keyframes highlight-flash-anim {
+  0% { background-color: rgba(255, 240, 0, 0.8); color: #000; box-shadow: 0 0 10px rgba(255, 240, 0, 0.8); }
+  20% { background-color: rgba(255, 240, 0, 0.8); color: #000; box-shadow: 0 0 15px rgba(255, 240, 0, 1); }
+  100% { background-color: transparent; color: inherit; box-shadow: none; }
+}
+
+.highlight-flash {
+  animation: highlight-flash-anim 2s ease-out forwards;
+  border-radius: 2px;
+  padding: 0 2px;
+  display: inline-block;
+}
+
 /* ═══ Export PDF Button ═══ */
 .cyber-btn--export {
   background: linear-gradient(135deg, #ff00e5, #b800a8);

@@ -20,7 +20,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const resultContainer = document.getElementById("resultContainer");
   const processedImg = document.getElementById("processedImg");
   const tagsArea = document.getElementById("tagsArea");
-  const ocrTextarea = document.getElementById("ocrTextarea");
+  const ocrTextContainer = document.getElementById("ocrTextContainer");
   const copyBtn = document.getElementById("copyBtn");
   const statDocType = document.getElementById("statDocType");
   const statConfidence = document.getElementById("statConfidence");
@@ -125,7 +125,14 @@ document.addEventListener("DOMContentLoaded", () => {
     tagsArea.innerHTML = "";
     const tc = ["green","cyan","magenta","yellow"];
     if (dd.tags && dd.tags.length) {
-      dd.tags.forEach((t, i) => { const b = document.createElement("span"); b.className = `tag-badge tag-badge--${tc[i%tc.length]}`; b.innerHTML = `<span>◈</span> ${esc(t.replace("#",""))}`; tagsArea.appendChild(b); });
+      dd.tags.forEach((t, i) => { 
+        const b = document.createElement("span"); 
+        b.className = `tag-badge tag-badge--clickable tag-badge--${tc[i%tc.length]}`; 
+        b.innerHTML = `<span>◈</span> ${esc(t.replace("#",""))}`; 
+        b.dataset.tag = t;
+        b.addEventListener("click", () => handleTagClick(t, dd));
+        tagsArea.appendChild(b); 
+      });
     } else { tagsArea.innerHTML = '<span class="font-mono text-xs text-cyber-muted">NO TAGS</span>'; }
 
     // Structured Data
@@ -142,7 +149,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // OCR Text
-    ocrTextarea.value = dd.extracted_text || "// NO TEXT EXTRACTED";
+    ocrTextContainer.textContent = dd.extracted_text || "// NO TEXT EXTRACTED";
 
     // Show PDF Export button
     exportPdfBtn.style.display = "flex";
@@ -164,10 +171,57 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // ── Copy ──
   copyBtn.addEventListener("click", () => {
-    if (!ocrTextarea.value) return;
-    navigator.clipboard.writeText(ocrTextarea.value).catch(() => { ocrTextarea.select(); document.execCommand("copy"); });
+    const textToCopy = lastResultData?.document_data?.extracted_text || "";
+    if (!textToCopy) return;
+    navigator.clipboard.writeText(textToCopy).catch(() => { 
+        const textArea = document.createElement("textarea");
+        textArea.value = textToCopy;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textArea);
+    });
     const o = copyBtn.innerHTML; copyBtn.innerHTML = '<span class="text-cyber-green">[ COPIED ✓ ]</span>'; setTimeout(() => copyBtn.innerHTML = o, 2000);
   });
+
+  // ── Interactive Highlight ──
+  function handleTagClick(tag, dd) {
+    if (!dd.tag_mapping || !dd.extracted_text) return;
+    const mapping = dd.tag_mapping.find(m => m.tag === tag);
+    if (!mapping || !mapping.exact_text) return;
+
+    const exactText = mapping.exact_text;
+    const fullText = dd.extracted_text;
+    const idx = fullText.indexOf(exactText);
+
+    if (idx === -1) {
+      showCyberAlert(`ไม่พบข้อความหัวข้อสำหรับ ${tag} ในเอกสาร`, 3000);
+      return;
+    }
+
+    // Reset container text
+    ocrTextContainer.textContent = fullText;
+    
+    // Inject highlight HTML
+    const before = esc(fullText.substring(0, idx));
+    const highlighted = `<span class="highlight-flash" id="active-highlight">${esc(exactText)}</span>`;
+    const after = esc(fullText.substring(idx + exactText.length));
+
+    ocrTextContainer.innerHTML = before + highlighted + after;
+
+    // Scroll into view inside the container
+    const highlightEl = document.getElementById('active-highlight');
+    if (highlightEl) {
+      highlightEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setTimeout(() => {
+        const el = document.getElementById('active-highlight');
+        if (el) {
+          const textNode = document.createTextNode(el.textContent);
+          el.parentNode.replaceChild(textNode, el);
+        }
+      }, 2000);
+    }
+  }
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   // 📄 PDF EXPORT — jsPDF + html2canvas
