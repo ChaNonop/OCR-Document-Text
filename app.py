@@ -33,19 +33,6 @@ import google.generativeai as genai
 # ── นำเข้า Image Processing Pipeline ──
 from utils.image_proces import smart_crop
 
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# 🔑 GEMINI API KEY — ใส่ API Key ของคุณตรงนี้!
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# วิธีขอ API Key: ไปที่ https://aistudio.google.com/apikey
-#
-# วิธีที่ 1: ใส่ตรงๆ ในโค้ด (สะดวก แต่ไม่ปลอดภัยถ้า push ขึ้น Git)
-#   GEMINI_API_KEY = "AIzaSy..."
-#
-# วิธีที่ 2: ตั้ง Environment Variable (แนะนำ!)
-#   Windows CMD:   set GEMINI_API_KEY=AIzaSy...
-#   Windows PS:    $env:GEMINI_API_KEY="AIzaSy..."
-#   Linux/Mac:     export GEMINI_API_KEY=AIzaSy...
-#
 # โหลดค่าจากไฟล์ key.env
 load_dotenv("key.env")
 
@@ -141,12 +128,8 @@ app.add_middleware(
 )
 
 
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# Startup Event — Initialize Gemini
-
 @app.on_event("startup")
 async def startup_event():
-    """Initialize Gemini model เมื่อ server เริ่มทำงาน."""
     global gemini_model
 
     logger.info("=" * 50)
@@ -188,9 +171,6 @@ def image_to_jpeg_bytes(image: np.ndarray, quality: int = 85) -> bytes:
 def encode_image_to_base64(image: np.ndarray, quality: int = 90) -> str:
     """
     แปลง numpy image เป็น Base64 data URI (JPEG).
-
-    Returns:
-        data URI string เช่น "data:image/jpeg;base64,/9j/4AAQ..."
     """
     encode_params = [cv2.IMWRITE_JPEG_QUALITY, quality]
     success, buffer = cv2.imencode(".jpg", image, encode_params)
@@ -205,11 +185,7 @@ def encode_image_to_base64(image: np.ndarray, quality: int = 90) -> str:
 # Helper: เรียก Gemini API วิเคราะห์เอกสาร
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 def clean_gemini_response(raw_text: str) -> str:
-    """
-    ทำความสะอาด response จาก Gemini:
-    - ลบ ```json ... ``` wrapper ออก
-    - ลบ whitespace ที่ไม่จำเป็น
-    """
+
     text = raw_text.strip()
 
     # ลบ markdown code block wrapper (```json ... ``` หรือ ``` ... ```)
@@ -220,20 +196,7 @@ def clean_gemini_response(raw_text: str) -> str:
 
 
 def analyze_with_gemini(image: np.ndarray) -> dict:
-    """
-    ส่งรูปภาพไปให้ Gemini AI วิเคราะห์เอกสาร.
 
-    Args:
-        image: OpenCV BGR image (numpy array) ที่ผ่าน Smart Crop แล้ว
-
-    Returns:
-        dict — ข้อมูลเอกสารที่ Gemini วิเคราะห์ได้ หรือ fallback structure ถ้า error
-
-    Error Handling:
-        - ถ้า API Key ไม่ได้ตั้ง → return fallback พร้อม error message
-        - ถ้า Gemini ตอบไม่ใช่ JSON → พยายาม parse อีกรอบ → ถ้าไม่ได้ก็ return fallback
-        - ถ้า network error → return fallback
-    """
     if gemini_model is None:
         logger.warning("[Gemini] Model not initialized — returning fallback")
         fallback = FALLBACK_DOCUMENT_DATA.copy()
@@ -329,26 +292,6 @@ def validate_upload(file: UploadFile, contents: bytes) -> None:
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 @app.post("/api/scan")
 async def scan_document(file: UploadFile = File(...)):
-    """
-    รับภาพเอกสาร → Smart Crop → Gemini AI วิเคราะห์ → Return JSON.
-
-    Pipeline:
-      1. Validate ไฟล์ (ขนาด, นามสกุล)
-      2. Decode เป็น OpenCV image
-      3. Smart Crop (Resize → Edge → Corner → Perspective Transform)
-      4. ส่งภาพให้ Gemini AI วิเคราะห์ OCR + จัดหมวดหมู่
-      5. Encode ภาพเป็น Base64
-      6. Return ทั้ง processed_image_base64 + document_data
-
-    Response JSON:
-      {
-        "status": "success",
-        "message": "...",
-        "processing_time_ms": 1234,
-        "processed_image_base64": "data:image/jpeg;base64,...",
-        "document_data": { ... Gemini analysis result ... }
-      }
-    """
     start_time = time.time()
 
     try:
@@ -417,10 +360,6 @@ async def scan_document(file: UploadFile = File(...)):
             },
         )
 
-
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# Health Check
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 @app.get("/")
 async def health_check():
     """ตรวจสอบสถานะ server และ Gemini AI."""
