@@ -17,12 +17,14 @@ import re
 from dotenv import load_dotenv
 
 # ── Fix Windows terminal encoding (cp1252 → utf-8) ──
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
-sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
+if sys.platform == "win32":
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
 
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 import cv2
 import numpy as np
 import base64
@@ -360,7 +362,7 @@ async def scan_document(file: UploadFile = File(...)):
             },
         )
 
-@app.get("/")
+@app.get("/api/health")
 async def health_check():
     """ตรวจสอบสถานะ server และ Gemini AI."""
     return {
@@ -370,3 +372,11 @@ async def health_check():
         "gemini_ready": gemini_model is not None,
         "endpoints": ["/api/scan"],
     }
+
+@app.get("/")
+async def serve_frontend():
+    """Serve the frontend index.html."""
+    return FileResponse("web/index.html")
+
+# ── Serve static files (CSS, JS, images) from /web ──
+app.mount("/web", StaticFiles(directory="web"), name="static")

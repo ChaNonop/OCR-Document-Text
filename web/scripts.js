@@ -3,7 +3,7 @@
  */
 document.addEventListener("DOMContentLoaded", () => {
   const MAX_FILE_SIZE = 4 * 1024 * 1024;
-  const API_ENDPOINT = "http://localhost:8000/api/scan";
+  const API_ENDPOINT = "/api/scan";
 
   // DOM refs
   const dropZone = document.getElementById("dropZone");
