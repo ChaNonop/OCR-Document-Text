@@ -14,6 +14,7 @@ import logging
 import time
 import json
 import re
+from dotenv import load_dotenv
 
 # ── Fix Windows terminal encoding (cp1252 → utf-8) ──
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
@@ -45,7 +46,10 @@ from utils.image_proces import smart_crop
 #   Windows PS:    $env:GEMINI_API_KEY="AIzaSy..."
 #   Linux/Mac:     export GEMINI_API_KEY=AIzaSy...
 #
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "YOUR_API_KEY_HERE")  # <-- เปลี่ยนตรงนี้!
+# โหลดค่าจากไฟล์ key.env
+load_dotenv("key.env")
+
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # Logging Setup
@@ -60,7 +64,7 @@ logger = logging.getLogger("ocr-engine")
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # Gemini AI — Configuration
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-GEMINI_MODEL_NAME = "gemini-1.5-flash"
+GEMINI_MODEL_NAME = "gemini-2.5-flash"
 gemini_model = None  # จะ init ตอน startup
 
 # Prompt ที่ส่งให้ Gemini วิเคราะห์เอกสาร
@@ -222,7 +226,6 @@ def analyze_with_gemini(image: np.ndarray) -> dict:
         - ถ้า Gemini ตอบไม่ใช่ JSON → พยายาม parse อีกรอบ → ถ้าไม่ได้ก็ return fallback
         - ถ้า network error → return fallback
     """
-    # ── Guard: ถ้า Gemini ไม่พร้อม ──
     if gemini_model is None:
         logger.warning("[Gemini] Model not initialized — returning fallback")
         fallback = FALLBACK_DOCUMENT_DATA.copy()
