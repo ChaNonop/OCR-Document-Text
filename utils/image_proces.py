@@ -1,12 +1,3 @@
-"""
-Image Processing Pipeline for DocScan OCR
-==========================================
-Helper functions สำหรับการประมวลผลภาพเอกสาร:
-  - Resize เพื่อความเร็ว
-  - Smart Crop (Edge Detection → Contour → Perspective Transform)
-  - Fallback อัตโนมัติถ้าหา 4 มุมไม่เจอ
-"""
-
 import cv2
 import numpy as np
 import logging
@@ -18,13 +9,6 @@ logger = logging.getLogger("ocr-engine")
 # 1. Resize — จำกัดด้านยาวไม่เกิน max_size px
 # ──────────────────────────────────────────────
 def resize_image(image: np.ndarray, max_size: int = 1024) -> tuple[np.ndarray, float]:
-    """
-    Resize ภาพโดยคงอัตราส่วน ให้ด้านที่ยาวสุดไม่เกิน max_size px.
-
-    Returns:
-        resized: ภาพที่ resize แล้ว
-        ratio:   ตัวคูณที่ใช้ย่อ (เอาไว้ map พิกัดกลับถ้าต้องการ)
-    """
     h, w = image.shape[:2]
     longest = max(h, w)
 
