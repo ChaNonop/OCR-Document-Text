@@ -135,7 +135,7 @@ app.add_middleware(
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # Startup Event — Initialize Gemini
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 @app.on_event("startup")
 async def startup_event():
     """Initialize Gemini model เมื่อ server เริ่มทำงาน."""
