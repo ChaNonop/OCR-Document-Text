@@ -1,3 +1,12 @@
+import sys
+import io
+import logging
+
+# === Fix Windows terminal encoding (cp1252 -> utf-8) ===
+# This prevents UnicodeEncodeError when printing Thai/Unicode text
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+
 from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -6,34 +15,37 @@ import numpy as np
 import easyocr
 import re
 import base64
-from fastapi.middleware.cors import CORSMiddleware
+import traceback # เพิ่มตัวช่วยแสดง Error อย่างละเอียด
+
+# === Setup Logging ===
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[logging.StreamHandler(stream=sys.stdout)]
+)
+logger = logging.getLogger("ocr-engine")
 
 # นำเข้าฟังก์ชันจากไฟล์ utils
 from utils.image_proces import detect_edges, find_document_corners, four_point_transform
 
 app = FastAPI(title="OCR Document Engine")
 
-# เพิ่ม / ตรวจสอบส่วนนี้ให้ดีครับ
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # อนุญาตให้เว็บจากทุกที่เข้าถึงได้ (สำคัญมากตอนทดสอบ)
+    allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["*"], # อนุญาตทั้ง GET, POST 
-    allow_headers=["*"], 
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
-print("กำลังโหลดโมเดล AI ภาษาไทยและอังกฤษ...")
-
-# โหลดโมเดล EasyOCR (ตั้งไว้ด้านนอกจะได้ไม่ต้องโหลดใหม่ทุกครั้งที่อัปโหลดรูป)
+logger.info("Loading EasyOCR model (Thai + English)...")
 reader = easyocr.Reader(['th', 'en'])
-print("โหลดโมเดลสำเร็จ! เซิร์ฟเวอร์พร้อมใช้งาน")
+logger.info("Model loaded successfully! Server is ready.")
 
 def generate_tags(text_list):
-    """ฟังก์ชันจัดหมวดหมู่ข้อความและสร้าง Tags"""
     tags = []
     full_text = " ".join(text_list).lower()
 
-    # กฎการแยกหมวดหมู่ (แก้ไขเพิ่มเติมได้ตามต้องการ)
     if re.search(r'invoice|ใบแจ้งหนี้|tax', full_text):
         tags.append("#Invoice")
     elif re.search(r'receipt|ใบเสร็จ|cash', full_text):
@@ -53,46 +65,69 @@ def generate_tags(text_list):
 @app.post("/api/upload")
 async def process_document(file: UploadFile = File(...)):
     try:
-        # 1. รับไฟล์รูปภาพและแปลงให้ OpenCV อ่านได้
+        logger.info(f"--- Processing file: {file.filename} ---")
+        
+        # 1. รับไฟล์
         contents = await file.read()
         nparr = np.frombuffer(contents, np.uint8)
         img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
         if img is None:
-             return JSONResponse(status_code=400, content={"error": "ไม่สามารถอ่านไฟล์รูปภาพได้"})
+             return JSONResponse(status_code=400, content={"error": "Invalid image file or corrupted data"})
+        logger.info("Step 1: Image loaded successfully")
 
-        # 2. กระบวนการตัดขอบรูปภาพ (OpenCV)
+        # 2. กระบวนการ OpenCV
         _, edge_img = detect_edges(img)
         corners = find_document_corners(edge_img)
+        logger.info("Step 2: Edge detection completed")
 
+        # ป้องกันบัค! ถ้าหาขอบไม่เจอ ให้ใช้รูปเดิม
         if corners is not None:
-            # ถ้าหาขอบเจอ ให้ทำการดัดและตัดภาพ
             processed_img = four_point_transform(img, corners)
-            status_msg = "ค้นหาขอบและตัดเอกสารสำเร็จ"
+            status_msg = "AI cropped and aligned the document successfully"
+            logger.info("Step 3: Document cropped and perspective-corrected")
         else:
-            # ถ้าหาไม่เจอ ให้ใช้รูปเดิม
-            processed_img = img
-            status_msg = "หาขอบไม่พบ ทำการอ่านข้อความจากภาพต้นฉบับ"
+            processed_img = img.copy() # ใช้รูปต้นฉบับ
+            status_msg = "No clear document edges found, using original image"
+            logger.info("Step 3: No 4-corner found, skipping crop")
 
-        # 3. กระบวนการอ่านข้อความ (EasyOCR)
-        # นำรูปที่ตัดแล้วส่งให้ AI อ่าน (detail=0 คือเอาแค่ตัวหนังสือ ไม่เอาพิกัดกล่อง)
+        # 3. กระบวนการ EasyOCR
         extracted_texts = reader.readtext(processed_img, detail=0)
+        
+        # เพิ่ม Fallback: ถ้ารูปที่ตัดขอบหาข้อความไม่เจอเลย อาจจะเพราะตัดผิดส่วน ให้ลองใช้รูปต้นฉบับ
+        if len(extracted_texts) == 0 and corners is not None:
+            logger.warning("Step 4.1: No text found in cropped image. Falling back to original image.")
+            processed_img = img.copy()
+            extracted_texts = reader.readtext(processed_img, detail=0)
+            status_msg = "No text found in cropped area, reverted to original image"
 
-        # 4. จัดหมวดหมู่สร้าง Tags
+        logger.info(f"Step 4: OCR completed — extracted {len(extracted_texts)} text blocks")
+
+        # 4. จัดหมวดหมู่
         document_tags = generate_tags(extracted_texts)
+        logger.info(f"Step 5: Tags generated: {document_tags}")
 
-        # 5. แปลงรูปภาพที่ตัดแล้วกลับเป็น Base64 เพื่อส่งกลับไปแสดงที่หน้าเว็บ
-        _, buffer = cv2.imencode('.jpg', processed_img)
+        # 5. แปลงรูปลง Base64
+        success, buffer = cv2.imencode('.jpg', processed_img)
+        if not success:
+            raise Exception("Failed to encode processed image to Base64")
+        
         img_base64 = base64.b64encode(buffer).decode('utf-8')
+        logger.info("Step 6: Base64 image encoding done")
 
-        # ส่งผลลัพธ์ทั้งหมดกลับไป!
-        return {
-            "status": "success",
-            "message": status_msg,
-            "tags": document_tags,
-            "texts": extracted_texts,
-            "processed_image_base64": f"data:image/jpeg;base64,{img_base64}"
-        }
+        logger.info("Processing complete! Sending response to frontend.")
+        return JSONResponse(
+            content={
+                "status": "success",
+                "message": status_msg,
+                "tags": document_tags,
+                "texts": extracted_texts,
+                "processed_image_base64": f"data:image/jpeg;base64,{img_base64}"
+            },
+            media_type="application/json; charset=utf-8"
+        )
 
     except Exception as e:
-        return JSONResponse(status_code=500, content={"error": str(e)})
+        logger.error(f"Critical error (500): {str(e)}")
+        traceback.print_exc() # พิมพ์รายละเอียดว่าพังที่บรรทัดไหนใน Terminal
+        return JSONResponse(status_code=500, content={"error": f"Internal Server Error: {str(e)}"})
