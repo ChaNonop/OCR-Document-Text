@@ -1,12 +1,3 @@
-"""
-DocScan OCR — Backend API (Step 2: OpenCV + Gemini AI)
-======================================================
-FastAPI server ที่รับภาพเอกสาร → Smart Crop ด้วย OpenCV → วิเคราะห์ด้วย Gemini AI → ส่ง JSON กลับ.
-
-Run:  uvicorn app:app --reload
-Docs: http://127.0.0.1:8000/docs
-"""
-
 import sys
 import io
 import os
@@ -16,7 +7,6 @@ import json
 import re
 from dotenv import load_dotenv
 
-# ── Fix Windows terminal encoding (cp1252 → utf-8) ──
 if sys.platform == "win32":
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
@@ -35,8 +25,33 @@ import google.generativeai as genai
 # ── นำเข้า Image Processing Pipeline ──
 from utils.image_proces import smart_crop
 
-# โหลดค่าจากไฟล์ key.env
-load_dotenv("key.env")
+# # โหลดค่าจากไฟล์ key.env
+
+# load_dotenv("key.env")
+
+# --- ส่วนที่ 1: จัดการ API KEY แบบปลอดภัย ---
+# พยายามโหลดจากไฟล์ .env (สำหรับรันบนคอมพิวเตอร์ Local)
+
+# --- ส่วนที่ 1: จัดการ API KEY แบบปลอดภัย ---
+# พยายามโหลดจากไฟล์ .env (สำหรับรันบนคอมพิวเตอร์ Local)
+try:
+    from dotenv import load_dotenv
+    # ค้นหาไฟล์ .env หรือ keys.env 
+    load_dotenv(dotenv_path="keys.env", override=False) 
+except ImportError:
+    pass # บนเซิร์ฟเวอร์อาจไม่มีไลบรารีนี้ ก็ให้ผ่านไป
+
+# ตั้งค่า Google Gemini API โดยดึงจาก OS ทันที (ซึ่งจะดึงค่าจาก Variables ของ Railway ได้)
+API_KEY = os.getenv("GEMINI_API_KEY")
+
+if API_KEY:
+    genai.configure(api_key=API_KEY)
+    print("โหลด Gemini API Key สำเร็จ พร้อมใช้งาน!")
+else:
+    print("คำเตือน: ไม่พบ GEMINI_API_KEY ในระบบ กรุณาตรวจสอบ Environment Variables")
+
+# --- ส่วนที่ 2: ตั้งค่า FastAPI ---
+app = FastAPI(title="DocScan OCR Engine")
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
