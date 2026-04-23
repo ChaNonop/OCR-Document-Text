@@ -6,25 +6,27 @@ import numpy as np
 import easyocr
 import re
 import base64
+from fastapi.middleware.cors import CORSMiddleware
 
 # นำเข้าฟังก์ชันจากไฟล์ utils
 from utils.image_proces import detect_edges, find_document_corners, four_point_transform
 
 app = FastAPI(title="OCR Document Engine")
 
-# อนุญาตให้หน้าเว็บ (Frontend) ยิงข้อมูลเข้ามาหา API ได้ (CORS)
+# เพิ่ม / ตรวจสอบส่วนนี้ให้ดีครับ
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # ในของจริงควรระบุโดเมน แต่เราใช้ * สำหรับทดสอบก่อน
+    allow_origins=["*"], # อนุญาตให้เว็บจากทุกที่เข้าถึงได้ (สำคัญมากตอนทดสอบ)
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["*"], # อนุญาตทั้ง GET, POST 
+    allow_headers=["*"], 
 )
 
-print("กำลังโหลดโมเดล AI ภาษาไทยและอังกฤษ... (อาจใช้เวลาสักครู่)")
-# โหลดโมเดล EasyOCR เตรียมไว้เลย (ตั้งไว้ด้านนอกจะได้ไม่ต้องโหลดใหม่ทุกครั้งที่อัปโหลดรูป)
+print("กำลังโหลดโมเดล AI ภาษาไทยและอังกฤษ...")
+
+# โหลดโมเดล EasyOCR (ตั้งไว้ด้านนอกจะได้ไม่ต้องโหลดใหม่ทุกครั้งที่อัปโหลดรูป)
 reader = easyocr.Reader(['th', 'en'])
-print("โหลดโมเดลสำเร็จ! เซิร์ฟเวอร์พร้อมใช้งาน 🚀")
+print("โหลดโมเดลสำเร็จ! เซิร์ฟเวอร์พร้อมใช้งาน")
 
 def generate_tags(text_list):
     """ฟังก์ชันจัดหมวดหมู่ข้อความและสร้าง Tags"""
