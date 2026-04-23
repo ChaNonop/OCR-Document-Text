@@ -5,8 +5,8 @@ import logging
 import time
 import json
 import re
-from dotenv import load_dotenv
 
+# Fix Windows terminal encoding
 if sys.platform == "win32":
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
@@ -20,38 +20,19 @@ import numpy as np
 import base64
 import traceback
 
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 
-# ── นำเข้า Image Processing Pipeline ──
 from utils.image_proces import smart_crop
 
-# # โหลดค่าจากไฟล์ key.env
-
-# load_dotenv("key.env")
-
-# --- ส่วนที่ 1: จัดการ API KEY แบบปลอดภัย ---
-# พยายามโหลดจากไฟล์ .env (สำหรับรันบนคอมพิวเตอร์ Local)
-
-# --- ส่วนที่ 1: จัดการ API KEY แบบปลอดภัย ---
-# พยายามโหลดจากไฟล์ .env (สำหรับรันบนคอมพิวเตอร์ Local)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# API KEY — โหลดจาก key.env (Local) หรือ Environment Variable (Railway)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 try:
     from dotenv import load_dotenv
-    # ค้นหาไฟล์ .env หรือ keys.env 
-    load_dotenv(dotenv_path="keys.env", override=False) 
+    load_dotenv("key.env", override=False)
 except ImportError:
-    pass # บนเซิร์ฟเวอร์อาจไม่มีไลบรารีนี้ ก็ให้ผ่านไป
-
-# ตั้งค่า Google Gemini API โดยดึงจาก OS ทันที (ซึ่งจะดึงค่าจาก Variables ของ Railway ได้)
-API_KEY = os.getenv("GEMINI_API_KEY")
-
-if API_KEY:
-    genai.configure(api_key=API_KEY)
-    print("โหลด Gemini API Key สำเร็จ พร้อมใช้งาน!")
-else:
-    print("คำเตือน: ไม่พบ GEMINI_API_KEY ในระบบ กรุณาตรวจสอบ Environment Variables")
-
-# --- ส่วนที่ 2: ตั้งค่า FastAPI ---
-app = FastAPI(title="DocScan OCR Engine")
+    pass  # บน Railway ไม่จำเป็นต้องใช้ dotenv
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
@@ -66,10 +47,10 @@ logging.basicConfig(
 logger = logging.getLogger("ocr-engine")
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# Gemini AI — Configuration
+# Gemini AI — Configuration (New SDK: google-genai)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 GEMINI_MODEL_NAME = "gemini-2.5-flash"
-gemini_model = None  # จะ init ตอน startup
+gemini_client = None  # จะ init ตอน startup
 
 # Prompt ที่ส่งให้ Gemini วิเคราะห์เอกสาร
 GEMINI_PROMPT = """นี่คือภาพเอกสาร จงวิเคราะห์ว่าเป็นเอกสารประเภทใด และจัดกลุ่มข้อความตามโครงสร้างที่เหมาะสม พร้อมทั้งจับประเด็นหัวข้อที่สำคัญของเอกสารนั้นๆแยกเป็นข้อ
@@ -135,7 +116,6 @@ app = FastAPI(
     version="2.1.0",
 )
 
-# ── CORS — อนุญาตให้ Frontend ที่อยู่คนละ Port เรียกได้ ──
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -147,34 +127,30 @@ app.add_middleware(
 
 @app.on_event("startup")
 async def startup_event():
-    global gemini_model
+    global gemini_client
 
     logger.info("=" * 50)
     logger.info("DocScan OCR Engine v2.1 — Starting up...")
 
-    if GEMINI_API_KEY == "YOUR_API_KEY_HERE" or not GEMINI_API_KEY:
+    if not GEMINI_API_KEY:
         logger.warning("GEMINI_API_KEY not set! AI analysis will return fallback data.")
-        logger.warning("  Set via: $env:GEMINI_API_KEY=\"your-key\" (PowerShell)")
-        logger.warning("  Or edit GEMINI_API_KEY in app.py directly")
-        gemini_model = None
+        gemini_client = None
     else:
         try:
-            genai.configure(api_key=GEMINI_API_KEY)
-            gemini_model = genai.GenerativeModel(GEMINI_MODEL_NAME)
-            logger.info(f"Gemini AI model '{GEMINI_MODEL_NAME}' initialized successfully!")
+            gemini_client = genai.Client(api_key=GEMINI_API_KEY)
+            logger.info(f"Gemini AI client initialized — model: '{GEMINI_MODEL_NAME}'")
         except Exception as e:
-            logger.error(f"Failed to initialize Gemini: {e}")
-            gemini_model = None
+            logger.error(f"Failed to initialize Gemini client: {e}")
+            gemini_client = None
 
     logger.info("Server is ready!")
     logger.info("=" * 50)
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# Helper: OpenCV image → JPEG bytes (สำหรับส่ง Gemini)
+# Helpers
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 def image_to_jpeg_bytes(image: np.ndarray, quality: int = 85) -> bytes:
-    """แปลง numpy image เป็น JPEG bytes สำหรับส่งให้ Gemini API."""
     encode_params = [cv2.IMWRITE_JPEG_QUALITY, quality]
     success, buffer = cv2.imencode(".jpg", image, encode_params)
     if not success:
@@ -182,68 +158,51 @@ def image_to_jpeg_bytes(image: np.ndarray, quality: int = 85) -> bytes:
     return buffer.tobytes()
 
 
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# Helper: แปลง OpenCV image → Base64 data URI
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 def encode_image_to_base64(image: np.ndarray, quality: int = 90) -> str:
-    """
-    แปลง numpy image เป็น Base64 data URI (JPEG).
-    """
     encode_params = [cv2.IMWRITE_JPEG_QUALITY, quality]
     success, buffer = cv2.imencode(".jpg", image, encode_params)
     if not success:
         raise ValueError("Failed to encode image to JPEG")
-
     b64_str = base64.b64encode(buffer).decode("utf-8")
     return f"data:image/jpeg;base64,{b64_str}"
 
 
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# Helper: เรียก Gemini API วิเคราะห์เอกสาร
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 def clean_gemini_response(raw_text: str) -> str:
-
     text = raw_text.strip()
-
-    # ลบ markdown code block wrapper (```json ... ``` หรือ ``` ... ```)
     text = re.sub(r"^```(?:json)?\s*\n?", "", text)
     text = re.sub(r"\n?```\s*$", "", text)
-
     return text.strip()
 
 
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Gemini API Call (New SDK)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 def analyze_with_gemini(image: np.ndarray) -> dict:
-
-    if gemini_model is None:
-        logger.warning("[Gemini] Model not initialized — returning fallback")
+    if gemini_client is None:
+        logger.warning("[Gemini] Client not initialized — returning fallback")
         fallback = FALLBACK_DOCUMENT_DATA.copy()
         fallback["ai_error"] = "Gemini API key not configured"
         return fallback
 
     try:
-        # ── 1. แปลง image → JPEG bytes ──
         img_bytes = image_to_jpeg_bytes(image, quality=85)
         logger.info(f"[Gemini] Sending image ({len(img_bytes) / 1024:.1f} KB) to {GEMINI_MODEL_NAME}...")
 
-        # ── 2. สร้าง image part สำหรับ Gemini ──
-        image_part = {
-            "mime_type": "image/jpeg",
-            "data": img_bytes,
-        }
+        # สร้าง image part สำหรับ google-genai SDK ใหม่
+        image_part = types.Part.from_bytes(data=img_bytes, mime_type="image/jpeg")
 
-        # ── 3. เรียก Gemini API ──
         gemini_start = time.time()
-        response = gemini_model.generate_content(
-            [image_part, GEMINI_PROMPT],
-            generation_config=genai.types.GenerationConfig(
-                temperature=0.1,        # ต่ำ = ตอบตรงตาม prompt มากขึ้น
+        response = gemini_client.models.generate_content(
+            model=GEMINI_MODEL_NAME,
+            contents=[image_part, GEMINI_PROMPT],
+            config=types.GenerateContentConfig(
+                temperature=0.1,
                 max_output_tokens=4096,
             ),
         )
         gemini_elapsed = round((time.time() - gemini_start) * 1000)
         logger.info(f"[Gemini] Response received in {gemini_elapsed}ms")
 
-        # ── 4. ดึง text response ──
         raw_text = response.text
         if not raw_text:
             logger.warning("[Gemini] Empty response from API")
@@ -251,21 +210,17 @@ def analyze_with_gemini(image: np.ndarray) -> dict:
             fallback["ai_error"] = "Gemini returned empty response"
             return fallback
 
-        # ── 5. ทำความสะอาดและ Parse JSON ──
         cleaned = clean_gemini_response(raw_text)
         logger.info(f"[Gemini] Raw response (first 200 chars): {cleaned[:200]}")
 
         try:
             document_data = json.loads(cleaned)
             logger.info(f"[Gemini] Parsed successfully — type: {document_data.get('document_type', 'N/A')}")
-            # เพิ่ม metadata
             document_data["gemini_processing_time_ms"] = gemini_elapsed
             return document_data
-
         except json.JSONDecodeError as je:
             logger.error(f"[Gemini] JSON parse failed: {je}")
             logger.error(f"[Gemini] Raw text was: {cleaned[:500]}")
-            # Fallback: ใส่ raw text ไว้ใน extracted_text แทน
             fallback = FALLBACK_DOCUMENT_DATA.copy()
             fallback["extracted_text"] = cleaned
             fallback["ai_error"] = f"Gemini response was not valid JSON: {str(je)}"
@@ -281,20 +236,18 @@ def analyze_with_gemini(image: np.ndarray) -> dict:
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# Allowed file extensions & validation
+# File Validation
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tiff", ".tif"}
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
 
 
 def validate_upload(file: UploadFile, contents: bytes) -> None:
-    """ตรวจสอบไฟล์ที่อัปโหลดก่อนประมวลผล."""
     if len(contents) > MAX_FILE_SIZE:
         raise HTTPException(
             status_code=413,
             detail=f"File too large ({len(contents) / 1024 / 1024:.1f} MB). Max: {MAX_FILE_SIZE / 1024 / 1024:.0f} MB",
         )
-
     filename = (file.filename or "").lower()
     ext = "." + filename.rsplit(".", 1)[-1] if "." in filename else ""
     if ext not in ALLOWED_EXTENSIONS:
@@ -315,12 +268,10 @@ async def scan_document(file: UploadFile = File(...)):
         logger.info(f"{'='*50}")
         logger.info(f"Incoming file: {file.filename}")
 
-        # ── 1. Read & Validate ──
         contents = await file.read()
         validate_upload(file, contents)
         logger.info(f"  File size: {len(contents) / 1024:.1f} KB")
 
-        # ── 2. Decode to OpenCV image ──
         nparr = np.frombuffer(contents, np.uint8)
         img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
@@ -333,19 +284,15 @@ async def scan_document(file: UploadFile = File(...)):
         orig_h, orig_w = img.shape[:2]
         logger.info(f"  Original size: {orig_w}x{orig_h}")
 
-        # ── 3. Smart Crop (OpenCV pipeline) ──
         processed_img, crop_message = smart_crop(img)
         proc_h, proc_w = processed_img.shape[:2]
         logger.info(f"  Processed size: {proc_w}x{proc_h}")
         logger.info(f"  Crop status: {crop_message}")
 
-        # ── 4. Gemini AI Analysis ──
         document_data = analyze_with_gemini(processed_img)
 
-        # ── 5. Encode processed image to Base64 ──
         img_base64 = encode_image_to_base64(processed_img, quality=90)
 
-        # ── 6. Calculate total timing ──
         elapsed_ms = round((time.time() - start_time) * 1000)
         logger.info(f"  Total processing time: {elapsed_ms}ms")
         logger.info(f"{'='*50}")
@@ -379,19 +326,17 @@ async def scan_document(file: UploadFile = File(...)):
 
 @app.get("/api/health")
 async def health_check():
-    """ตรวจสอบสถานะ server และ Gemini AI."""
     return {
         "status": "online",
         "engine": "DocScan OCR v2.1",
         "gemini_model": GEMINI_MODEL_NAME,
-        "gemini_ready": gemini_model is not None,
+        "gemini_ready": gemini_client is not None,
         "endpoints": ["/api/scan"],
     }
 
 @app.get("/")
 async def serve_frontend():
-    """Serve the frontend index.html."""
     return FileResponse("web/index.html")
 
-# ── Serve static files (CSS, JS, images) from /web ──
+# Serve static files (CSS, JS, images) from /web
 app.mount("/web", StaticFiles(directory="web"), name="static")
