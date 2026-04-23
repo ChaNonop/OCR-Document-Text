@@ -1,122 +1,310 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="th">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DocScan OCR — Document Categorizer</title>
-    
-    <!-- นำเข้า Fonts -->
+    <title>DocScan OCR — Cyberpunk Document Scanner</title>
+    <meta name="description" content="AI-Powered Document Scanner with OCR & Auto-Categorization. Upload, scan, and extract text from documents instantly.">
+
+    <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
-    
-    <!-- นำเข้า Tailwind CSS -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Rajdhani:wght@300;400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet" />
+
+    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              orbitron: ['Orbitron', 'sans-serif'],
+              rajdhani: ['Rajdhani', 'sans-serif'],
+              mono: ['Share Tech Mono', 'monospace'],
+            },
+            colors: {
+              cyber: {
+                bg: '#030711',
+                surface: '#0a0f1e',
+                card: '#0d1327',
+                border: '#1a2744',
+                cyan: '#00f0ff',
+                magenta: '#ff00e5',
+                yellow: '#f0ff00',
+                green: '#00ff9d',
+                red: '#ff003c',
+                muted: '#4a6085',
+                text: '#e0eaff',
+              }
+            }
+          }
+        }
+      }
+    </script>
 
     <link rel="stylesheet" href="styles.css">
-
     <script defer src="scripts.js"></script>
-
 </head>
-<body class="min-h-screen flex flex-col items-center py-10 px-4 sm:px-6">
 
-    <!-- Header -->
-    <header class="w-full max-w-6xl mb-8">
-        <h1 class="text-3xl font-bold tracking-wider flex items-center gap-3">
-            <span class="text-[var(--cyan)]">◈</span> 
-            DocScan OCR
-        </h1>
-        <p class="text-[var(--muted)] font-mono text-sm mt-2">AI-POWERED DOCUMENT CATEGORIZER V1.0</p>
+<body class="min-h-screen flex flex-col items-center py-6 px-4 sm:px-6 overflow-x-hidden font-rajdhani">
+
+    <!-- ═══ Animated Background Grid ═══ -->
+    <div id="bgGrid" class="bg-grid"></div>
+    <div class="bg-glow bg-glow--cyan"></div>
+    <div class="bg-glow bg-glow--magenta"></div>
+
+    <!-- ═══ Floating Particles ═══ -->
+    <canvas id="particleCanvas" class="particle-canvas"></canvas>
+
+    <!-- ═══ Custom Cyberpunk Alert ═══ -->
+    <div id="cyberAlert" class="cyber-alert">
+        <div class="cyber-alert__inner">
+            <div class="cyber-alert__glitch-bar"></div>
+            <div class="cyber-alert__content">
+                <div class="cyber-alert__icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                        <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                    </svg>
+                </div>
+                <div>
+                    <p class="cyber-alert__title">SYSTEM ERROR</p>
+                    <p id="alertMessage" class="cyber-alert__msg"></p>
+                </div>
+            </div>
+            <button id="alertCloseBtn" class="cyber-alert__close">[DISMISS]</button>
+            <div class="cyber-alert__glitch-bar cyber-alert__glitch-bar--bottom"></div>
+        </div>
+    </div>
+
+    <!-- ═══ Header ═══ -->
+    <header id="appHeader" class="w-full max-w-7xl mb-6 relative z-10">
+        <div class="flex items-center gap-4">
+            <div class="header-logo">
+                <span class="header-logo__hex">⬡</span>
+            </div>
+            <div>
+                <h1 class="text-3xl sm:text-4xl font-orbitron font-bold tracking-wider">
+                    <span class="text-cyber-cyan neon-text">DOC</span><span class="text-cyber-text">SCAN</span>
+                </h1>
+                <p class="font-mono text-xs text-cyber-muted tracking-[0.3em] mt-1">
+                    <span class="text-cyber-cyan">▸</span> AI-POWERED OCR ENGINE <span class="text-cyber-magenta">v2.1</span>
+                    <span class="blink-cursor">_</span>
+                </p>
+            </div>
+        </div>
+
+        <!-- Status Bar -->
+        <div class="status-bar mt-4">
+            <div class="status-bar__item">
+                <span class="status-dot status-dot--green"></span>
+                <span>SYSTEM ONLINE</span>
+            </div>
+            <div class="status-bar__item">
+                <span class="status-dot status-dot--cyan"></span>
+                <span>GEMINI AI READY</span>
+            </div>
+            <div class="status-bar__item">
+                <span id="clockDisplay" class="text-cyber-yellow"></span>
+            </div>
+        </div>
     </header>
 
-    <main class="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-12 gap-6">
-        
-        <!-- Left Column: Upload & Original Preview -->
+    <!-- ═══ Main Content ═══ -->
+    <main class="w-full max-w-7xl grid grid-cols-1 lg:grid-cols-12 gap-6 relative z-10">
+
+        <!-- ═══ Left Column: Upload & Preview ═══ -->
         <div class="lg:col-span-5 space-y-6">
-            
+
             <!-- Upload Card -->
-            <div class="glass-card p-6">
-                <div class="flex items-center justify-between mb-4">
-                    <h2 class="text-sm font-semibold tracking-widest text-[var(--muted)] uppercase">Input Source</h2>
-                    <span class="text-xs font-mono bg-[var(--surface)] px-2 py-1 rounded text-[var(--cyan)] border border-[var(--border)]">READY</span>
+            <div class="cyber-card">
+                <div class="cyber-card__header">
+                    <div class="flex items-center gap-2">
+                        <span class="cyber-card__dot"></span>
+                        <h2 class="font-orbitron text-xs tracking-[0.2em] text-cyber-muted">INPUT SOURCE</h2>
+                    </div>
+                    <span id="statusBadge" class="cyber-badge cyber-badge--idle">IDLE</span>
                 </div>
 
-                <form id="uploadForm" class="space-y-4">
-                    <div id="dropZone" class="upload-area rounded-lg p-8 flex flex-col items-center justify-center text-center relative">
-                        <input type="file" id="fileInput" accept="image/*" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" required>
-                        <svg class="w-12 h-12 text-[var(--muted)] mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
-                        <p class="text-sm font-medium mb-1">Drop image here or browse</p>
-                        <p class="text-xs text-[var(--muted)] font-mono">JPG, PNG, WEBP (MAX. 5MB)</p>
+                <form id="uploadForm" class="space-y-4 mt-4">
+                    <div id="dropZone" class="drop-zone">
+                        <input type="file" id="fileInput" accept="image/*" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" required>
+
+                        <!-- Corner Brackets -->
+                        <div class="drop-zone__corner drop-zone__corner--tl"></div>
+                        <div class="drop-zone__corner drop-zone__corner--tr"></div>
+                        <div class="drop-zone__corner drop-zone__corner--bl"></div>
+                        <div class="drop-zone__corner drop-zone__corner--br"></div>
+
+                        <div id="dropZoneContent" class="drop-zone__content">
+                            <div class="drop-zone__icon">
+                                <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                                </svg>
+                            </div>
+                            <p class="text-sm font-semibold mt-3 text-cyber-text">DROP FILE OR CLICK TO BROWSE</p>
+                            <p class="text-xs font-mono text-cyber-muted mt-1">JPG • PNG • WEBP &nbsp;|&nbsp; MAX <span class="text-cyber-yellow">4MB</span></p>
+                        </div>
                     </div>
 
-                    <button type="submit" id="submitBtn" class="btn-primary w-full py-3 rounded-md font-bold uppercase tracking-wider flex items-center justify-center gap-2" disabled>
-                        <span>Upload Document</span>
+                    <button type="submit" id="submitBtn" class="cyber-btn w-full" disabled>
+                        <span class="cyber-btn__text">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                            INITIALIZE SCAN
+                        </span>
+                        <span class="cyber-btn__glitch"></span>
                     </button>
                 </form>
             </div>
 
             <!-- Original Image Preview -->
-            <div id="originalPreviewCard" class="glass-card p-6 hidden">
-                <h2 class="text-sm font-semibold tracking-widest text-[var(--muted)] uppercase mb-4">Original Image</h2>
-                <div id="imageContainer" class="relative rounded bg-[var(--surface)] border border-[var(--border)] flex items-center justify-center overflow-hidden min-h-[200px]">
-                    <img id="originalImg" src="" alt="Original" class="max-h-[300px] object-contain opacity-80">
+            <div id="originalPreviewCard" class="cyber-card hidden">
+                <div class="cyber-card__header">
+                    <div class="flex items-center gap-2">
+                        <span class="cyber-card__dot cyber-card__dot--cyan"></span>
+                        <h2 class="font-orbitron text-xs tracking-[0.2em] text-cyber-muted">SOURCE IMAGE</h2>
+                    </div>
+                    <span id="fileSizeBadge" class="font-mono text-xs text-cyber-green"></span>
+                </div>
+                <div id="imageContainer" class="image-preview mt-4">
+                    <img id="originalImg" src="" alt="Original document" class="max-h-[320px] object-contain relative z-[1]">
+
+                    <!-- Scanner Line -->
                     <div class="scanner-line"></div>
-                    
-                    <!-- Loading Overlay (ในรูป) -->
-                    <div id="scanOverlay" class="absolute inset-0 bg-[#080c14cc] backdrop-blur-sm hidden flex-col items-center justify-center">
-                        <div class="loader mb-3"></div>
-                        <span class="text-xs font-mono text-[var(--cyan)] animate-pulse">PROCESSING DATA...</span>
+
+                    <!-- Scan Overlay -->
+                    <div id="scanOverlay" class="scan-overlay hidden">
+                        <div class="scan-overlay__ring"></div>
+                        <div class="scan-overlay__text">
+                            <span class="font-orbitron text-xs tracking-widest text-cyber-cyan">ANALYZING</span>
+                            <div class="scan-overlay__dots">
+                                <span></span><span></span><span></span>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Right Column: Results -->
+        <!-- ═══ Right Column: Results ═══ -->
         <div class="lg:col-span-7 space-y-6">
-            
+
             <!-- Empty State -->
-            <div id="emptyState" class="glass-card p-12 h-full flex flex-col items-center justify-center text-center min-h-[400px]">
-                <svg class="w-16 h-16 text-[var(--border2)] mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
-                <p class="text-[var(--muted)] font-mono text-sm">AWAITING DOCUMENT INPUT...</p>
+            <div id="emptyState" class="cyber-card min-h-[500px] flex flex-col items-center justify-center text-center">
+                <div class="empty-state">
+                    <div class="empty-state__hexagon">
+                        <svg class="w-16 h-16 text-cyber-border" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="0.8" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                        </svg>
+                    </div>
+                    <p class="font-orbitron text-sm text-cyber-muted tracking-widest mt-6">AWAITING INPUT</p>
+                    <p class="font-mono text-xs text-cyber-border mt-2">Upload a document to begin AI analysis</p>
+                    <div class="empty-state__line mt-6"></div>
+                </div>
             </div>
 
-            <!-- Result Container -->
+            <!-- ═══ Result Container ═══ -->
             <div id="resultContainer" class="hidden space-y-6">
-                
-                <!-- Top Row: Cropped Image & Categories -->
+
+                <!-- Stats Row -->
+                <div class="grid grid-cols-3 gap-3">
+                    <div class="cyber-stat">
+                        <span class="cyber-stat__label">DOC TYPE</span>
+                        <span id="statDocType" class="cyber-stat__value text-cyber-cyan">—</span>
+                    </div>
+                    <div class="cyber-stat">
+                        <span class="cyber-stat__label">CONFIDENCE</span>
+                        <span id="statConfidence" class="cyber-stat__value text-cyber-green">—</span>
+                    </div>
+                    <div class="cyber-stat">
+                        <span class="cyber-stat__label">PROCESS TIME</span>
+                        <span id="statTime" class="cyber-stat__value text-cyber-yellow">—</span>
+                    </div>
+                </div>
+
+                <!-- Cropped Image + Tags -->
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    
-                    <!-- Cropped Image -->
-                    <div class="glass-card p-6">
-                        <h2 class="text-sm font-semibold tracking-widest text-[var(--muted)] uppercase mb-4">Processed Image</h2>
-                        <div class="bg-[var(--surface)] border border-[var(--border)] rounded p-2 flex items-center justify-center min-h-[200px]">
-                            <img id="processedImg" src="" alt="Cropped" class="max-h-[250px] object-contain">
+
+                    <!-- Processed Image -->
+                    <div class="cyber-card">
+                        <div class="cyber-card__header">
+                            <div class="flex items-center gap-2">
+                                <span class="cyber-card__dot cyber-card__dot--green"></span>
+                                <h2 class="font-orbitron text-xs tracking-[0.2em] text-cyber-muted">PROCESSED</h2>
+                            </div>
+                        </div>
+                        <div class="image-preview mt-4">
+                            <img id="processedImg" src="" alt="Processed document" class="max-h-[260px] object-contain">
                         </div>
                     </div>
 
-                    <!-- Categories / Tags -->
-                    <div class="glass-card p-6">
-                        <h2 class="text-sm font-semibold tracking-widest text-[var(--muted)] uppercase mb-4">Categorized Content</h2>
-                        <div id="tagsArea" class="space-y-3">
-                            <!-- Tags will be injected here -->
+                    <!-- Categories / Tags + Summary -->
+                    <div class="cyber-card flex flex-col">
+                        <div class="cyber-card__header">
+                            <div class="flex items-center gap-2">
+                                <span class="cyber-card__dot cyber-card__dot--magenta"></span>
+                                <h2 class="font-orbitron text-xs tracking-[0.2em] text-cyber-muted">ANALYSIS</h2>
+                            </div>
+                        </div>
+
+                        <!-- Document Type -->
+                        <div class="mt-4 mb-3">
+                            <span class="font-mono text-xs text-cyber-muted">DOCUMENT_TYPE:</span>
+                            <p id="docTypeFull" class="text-lg font-orbitron font-bold text-cyber-cyan mt-1">—</p>
+                        </div>
+
+                        <!-- Tags -->
+                        <div id="tagsArea" class="flex flex-wrap gap-2 mb-4">
+                            <!-- Tags injected here -->
+                        </div>
+
+                        <!-- Summary -->
+                        <div class="mt-auto pt-3 border-t border-cyber-border">
+                            <span class="font-mono text-xs text-cyber-muted">SUMMARY:</span>
+                            <p id="summaryText" class="text-sm text-cyber-text mt-1 leading-relaxed">—</p>
                         </div>
                     </div>
                 </div>
 
-                <!-- Bottom Row: Raw OCR Text -->
-                <div class="glass-card p-6 flex flex-col h-[300px]">
-                    <div class="flex items-center justify-between mb-4">
-                        <h2 class="text-sm font-semibold tracking-widest text-[var(--muted)] uppercase">Raw OCR Text</h2>
-                        <button id="copyBtn" class="text-xs font-mono text-[var(--cyan)] hover:text-white transition-colors">
-                            [ COPY ALL ]
+                <!-- Structured Data -->
+                <div id="structuredDataCard" class="cyber-card hidden">
+                    <div class="cyber-card__header">
+                        <div class="flex items-center gap-2">
+                            <span class="cyber-card__dot cyber-card__dot--yellow"></span>
+                            <h2 class="font-orbitron text-xs tracking-[0.2em] text-cyber-muted">STRUCTURED DATA</h2>
+                        </div>
+                    </div>
+                    <div id="structuredDataContent" class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3 font-mono text-sm">
+                        <!-- Structured fields injected here -->
+                    </div>
+                </div>
+
+                <!-- Raw OCR Text -->
+                <div class="cyber-card flex flex-col h-[300px]">
+                    <div class="cyber-card__header">
+                        <div class="flex items-center gap-2">
+                            <span class="cyber-card__dot cyber-card__dot--cyan"></span>
+                            <h2 class="font-orbitron text-xs tracking-[0.2em] text-cyber-muted">EXTRACTED TEXT</h2>
+                        </div>
+                        <button id="copyBtn" class="font-mono text-xs text-cyber-cyan hover:text-white transition-colors group">
+                            <span class="group-hover:hidden">[ COPY_ALL ]</span>
+                            <span class="hidden group-hover:inline text-cyber-magenta">[ EXECUTE ]</span>
                         </button>
                     </div>
-                    <textarea id="ocrTextarea" class="ocr-textarea w-full flex-1 p-4 rounded font-mono text-sm leading-relaxed" spellcheck="false" readonly></textarea>
+                    <textarea id="ocrTextarea" class="ocr-textarea w-full flex-1 mt-3 p-4 rounded font-mono text-sm leading-relaxed" spellcheck="false" readonly></textarea>
                 </div>
 
             </div>
         </div>
     </main>
+
+    <!-- ═══ Footer ═══ -->
+    <footer class="w-full max-w-7xl mt-8 pt-4 border-t border-cyber-border relative z-10">
+        <div class="flex items-center justify-between font-mono text-xs text-cyber-muted">
+            <span>◈ DOCSCAN OCR ENGINE v2.1</span>
+            <span>POWERED BY <span class="text-cyber-cyan">By non</span></span>
+        </div>
+    </footer>
 
 </body>
 </html>

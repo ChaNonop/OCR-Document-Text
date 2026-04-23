@@ -1,7 +1,6 @@
 opencv-python
 numpy
-easyocr
 fastapi
-uvicorn
-streamlit
+uvicorn[standard]
 python-multipart
+google-generativeai
