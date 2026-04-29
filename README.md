@@ -47,13 +47,13 @@
 
 ### 🖥️ Frontend
 
-- **HTML + Tailwind CSS** — UI สไตล์ Cyberpunk / Modern Dashboard
+- **HTML + Tailwind CSS** — UI Modern Dashboard
 - **Vanilla JavaScript** — ควบคุมการทำงาน (ตรวจสอบไฟล์, อัปโหลด, แสดงผล)
 - **jsPDF** — สร้างและส่งออก PDF จากฝั่ง Browser โดยตรง
 
 ### ⚙️ Backend
 
-- **Python + FastAPI** — API Server ที่รวดเร็วและ lightweight
+- **Python + FastAPI** — API Server
 - **OpenCV** — Image Processing (Resize, หา 4 มุม, Perspective Transform)
 - **Google Gemini API** `gemini-1.5-flash` — OCR + จัดหมวดหมู่เป็น JSON
 
