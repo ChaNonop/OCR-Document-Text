@@ -133,7 +133,7 @@ cd OCR-Document-Text
 pip install -r requirements.txt
 ```
 
-### 3. ตั้งค่า Environment Variables
+### 3. ตั้งค่า Environment Variables ตามนี้
 
 สร้างไฟล์ `.env` ในโฟลเดอร์หลัก:
 
